@@ -10,7 +10,7 @@ def load_csv(file_path: str) -> pd.DataFrame | None:
         DataFrame if file exists, None if not found.
     """
     try:
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, low_memory=False)
         print(f"Loaded {len(df)} rows from {file_path}")
         return df
 
@@ -18,7 +18,7 @@ def load_csv(file_path: str) -> pd.DataFrame | None:
         print(f"File not found: {file_path}")
         return None
     
-def load_mimic_data(data_dir: str) -> dict:
+def load_mimic_data(data_dir: str) -> dict[str, pd.DataFrame]:
     """Load all MIMIC-III datasets.
     
     Args:
@@ -85,6 +85,38 @@ def calculate_vital_stats(patient_vitals: pd.DataFrame, item_names: dict) -> dic
             }
     
     return stats
+
+def count_vitals_by_type(patient_vitals: pd.DataFrame) -> dict:
+    """counts vitals types by id's
+
+    Args:
+        patient_vitals (pd.DataFrame): DataFrame with patient's 
+        vital readings.
+
+    Returns:
+        dict: dict showing how many readings exist for 
+        each itemid.
+    """
+    return patient_vitals["itemid"].value_counts().to_dict()
+
+def get_multiple_patients_vitals(patient_ids: list[int], chartevents: pd.DataFrame, vital_ids: list[int]) -> pd.DataFrame:
+    """Get vital sign readings for multiple patients.
+    
+    Args:
+        patient_ids: List of patient subject IDs.
+        chartevents: The chartevents DataFrame.
+        vital_ids: List of vital sign item IDs to filter.
+        
+    Returns:
+        DataFrame with vital readings for all specified patients.
+    """
+    patient_vitals = chartevents[
+        (chartevents["subject_id"].isin(patient_ids)) &
+        (chartevents["itemid"].isin(vital_ids))
+    ]
+
+    patient_vitals = patient_vitals.copy()
+    return patient_vitals
     
 if __name__ == "__main__":
     datasets = load_mimic_data("data")
@@ -108,3 +140,11 @@ if __name__ == "__main__":
         print(f"\n{vital_name}")
         print(f" Average: {vital_stats['mean']}, Min: {vital_stats['min']}, Max: {vital_stats['max']}, Count: {vital_stats['count']}")
 
+    vital_counts = count_vitals_by_type(vitals)
+    print(f"\nReadings per vital type: {vital_counts}")
+
+    sample_ids = datasets["chartevents"]["subject_id"].unique()[:3].tolist()
+    print(f"\nSample patient ID:s {sample_ids}")
+
+    multi_vitals = get_multiple_patients_vitals(sample_ids, datasets["chartevents"], VITAL_IDS)
+    print(f"\nTotal readings for {len(sample_ids)} patients: {len(multi_vitals)}")
